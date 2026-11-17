@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hình Chóp Tứ Giác Đều 3D - Three.js</title>
+    <!-- Tải Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tải Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tải Three.js (r128) và OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0f172a; /* Slate 900 */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            touch-action: none; /* Ngăn chặn cuộn trang mặc định trên thiết bị cảm ứng */
+        }
+        /* Tùy chỉnh thanh trượt (Range Slider) */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+            transition: transform 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="text-slate-100 antialiased">
+
+    <!-- Container chứa Canvas 3D -->
+    <div id="canvas-container"></div>
+
+    <!-- Tiêu đề & Hướng dẫn ở góc trên bên trái -->
+    <div class="fixed top-4 left-4 z-10 pointer-events-none max-w-xs sm:max-w-sm">
+        <div class="bg-slate-900/75 backdrop-blur-md border border-slate-700/60 p-4 rounded-2xl shadow-2xl">
+            <div class="flex items-center gap-2.5 mb-1">
+                <div class="w-3 h-3 rounded-full bg-sky-400 animate-pulse"></div>
+                <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">Hình Chóp Tứ Giác Đều 3D</h1>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed hidden sm:block">
+                • <b>Chuột trái / 1 ngón:</b> Xoay 360°<br>
+                • <b>Con lăn / 2 ngón:</b> Phóng to / Thu nhỏ<br>
+                • <b>Chuột phải / Kéo 2 ngón:</b> Di chuyển góc nhìn
+            </p>
+            <p class="text-xs text-slate-300 sm:hidden">
+                Chạm và kéo để xoay 360° • Chụm 2 ngón để thu phóng
+            </p>
+        </div>
+    </div>
+
+    <!-- Nút mở/đóng bảng điều khiển trên Mobile -->
+    <button id="toggle-panel-btn" class="fixed top-4 right-4 z-20 sm:hidden bg-slate-800/90 backdrop-blur-md border border-slate-700 text-white p-3 rounded-xl shadow-lg active:scale-95 transition">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+        </svg>
+    </button>
+
+    <!-- Bảng điều khiển (UI Control Panel) -->
+    <div id="control-panel" class="fixed bottom-4 left-4 right-4 sm:left-auto sm:top-4 sm:bottom-auto sm:right-4 sm:w-80 z-10 transition-all duration-300 transform translate-y-0">
+        <div class="bg-slate-900/80 backdrop-blur-xl border border-slate-700/70 p-4 sm:p-5 rounded-2xl shadow-2xl space-y-4">
+            
+            <div class="flex items-center justify-between border-b border-slate-700/60 pb-2.5">
+                <span class="text-sm font-semibold text-sky-400 uppercase tracking-wider">Bảng Điều Khiển</span>
+                <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">S.ABCD</span>
+            </div>
+
+            <!-- 1. Chế độ tự động xoay -->
+            <div class="flex items-center justify-between">
+                <label for="auto-rotate" class="text-sm font-medium text-slate-200 cursor-pointer">Tự động xoay</label>
+                <button id="btn-auto-rotate" type="button" role="switch" aria-checked="true" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-sky-500 transition-colors duration-200 ease-in-out focus:outline-none">
+                    <span id="auto-rotate-knob" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-5"></span>
+                </button>
+            </div>
+
+            <!-- 2. Chế độ hiển thị (Khối đặc / Xuyên thấu / Khung dây) -->
+            <div class="space-y-1.5">
+                <span class="text-xs font-medium text-slate-400 block">Chế độ hiển thị</span>
+                <div class="grid grid-cols-3 gap-1.5 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
+                    <button id="mode-solid" class="py-1.5 px-1.5 text-[11px] font-medium rounded-lg bg-sky-500 text-white shadow transition">
+                        Khối đặc
+                    </button>
+                    <button id="mode-translucent" class="py-1.5 px-1.5 text-[11px] font-medium rounded-lg text-slate-400 hover:text-white transition">
+                        Xuyên thấu
+                    </button>
+                    <button id="mode-wireframe" class="py-1.5 px-1.5 text-[11px] font-medium rounded-lg text-slate-400 hover:text-white transition">
+                        Khung dây
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. Độ trong suốt của các mặt -->
+            <div id="opacity-control-group" class="space-y-1.5 transition-opacity duration-200 opacity-40 pointer-events-none">
+                <div class="flex justify-between text-xs">
+                    <span class="font-medium text-slate-300">Độ mờ các mặt (Opacity)</span>
+                    <span id="opacity-value" class="font-mono text-sky-400 font-semibold">70%</span>
+                </div>
+                <input id="opacity-slider" type="range" min="0.1" max="1" step="0.05" value="0.7" class="w-full">
+            </div>
+
+            <!-- 4. Bảng màu sắc -->
+            <div class="space-y-1.5">
+                <span class="text-xs font-medium text-slate-400 block">Bảng màu hình chóp</span>
+                <div class="grid grid-cols-4 gap-2">
+                    <button data-theme="emerald" class="theme-btn ring-2 ring-sky-400 h-8 rounded-lg bg-gradient-to-tr from-emerald-700 to-lime-400 shadow-sm transition transform active:scale-95" title="Xanh Ngọc"></button>
+                    <button data-theme="gold" class="theme-btn h-8 rounded-lg bg-gradient-to-tr from-amber-600 via-yellow-400 to-amber-200 shadow-sm opacity-75 hover:opacity-100 transition transform active:scale-95" title="Hoàng Kim"></button>
+                    <button data-theme="sunset" class="theme-btn h-8 rounded-lg bg-gradient-to-tr from-purple-700 via-pink-500 to-orange-400 shadow-sm opacity-75 hover:opacity-100 transition transform active:scale-95" title="Tím Hoàng Hôn"></button>
+                    <button data-theme="ruby" class="theme-btn h-8 rounded-lg bg-gradient-to-tr from-rose-800 via-red-500 to-pink-400 shadow-sm opacity-75 hover:opacity-100 transition transform active:scale-95" title="Đỏ Ruby"></button>
+                </div>
+            </div>
+
+            <!-- 5. Các tùy chọn phụ & Reset Camera -->
+            <div class="pt-2 border-t border-slate-700/60 flex items-center justify-between gap-2">
+                <button id="btn-toggle-grid" class="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-xl border border-slate-700 transition active:scale-95">
+                    Ẩn/Hiện Lưới
+                </button>
+                <button id="btn-reset-camera" class="flex-1 py-2 px-3 bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-xs font-semibold rounded-xl border border-sky-500/40 transition active:scale-95 flex items-center justify-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Đặt lại góc nhìn
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Biến toàn cục cho Three.js
+        let scene, camera, renderer, controls;
+        let pyramidGroup, pyramidMesh, edgesLine, gridHelper, shadowPlane, heightLine;
+        let faceMaterials = [];
+        let labelSprites = [];
+        
+        // Trạng thái ứng dụng
+        const state = {
+            autoRotate: true,
+            displayMode: 'solid', // 'solid' | 'translucent' | 'wireframe'
+            opacity: 0.7,
+            theme: 'emerald',
+            showGrid: true
+        };
+
+        // Định nghĩa các bộ màu (Mặt 1, Mặt 2, Mặt 3, Mặt 4, Mặt Đáy 1, Mặt Đáy 2)
+        const colorThemes = {
+            emerald: [0x059669, 0x10b981, 0x34d399, 0x0d9488, 0x064e3b, 0x064e3b], // Xanh Ngọc
+            gold:    [0xd97706, 0xf59e0b, 0xfbbf24, 0xb45309, 0x78350f, 0x78350f], // Hoàng Kim
+            sunset:  [0x9333ea, 0xdb2777, 0xf97316, 0x7e22ce, 0x4c1d95, 0x4c1d95], // Tím Hoàng Hôn
+            ruby:    [0xe11d48, 0xf43f5e, 0xbe123c, 0xfb7185, 0x881337, 0x881337]  // Đỏ Ruby
+        };
+
+        // Vị trí Camera mặc định
+        const defaultCameraPos = { x: 4.2, y: 3.4, z: 4.6 };
+        const defaultTargetPos = { x: 0, y: 1.0, z: 0 };
+
+        // Khởi chạy ứng dụng khi trang tải xong
+        window.onload = function() {
+            init();
+            animate();
+        };
+
+        /**
+         * Hàm khởi tạo Scene, Camera, Renderer, Ánh sáng và Các đối tượng 3D
+         */
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            // 1. Tạo Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f172a);
+            scene.fog = new THREE.FogExp2(0x0f172a, 0.032);
+
+            // 2. Tạo Camera
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(defaultCameraPos.x, defaultCameraPos.y, defaultCameraPos.z);
+
+            // 3. Tạo Renderer với hỗ trợ đổ bóng (ShadowMap)
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Tối ưu hiệu năng cho màn hình Retina
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 4. Thiết lập OrbitControls (Xoay, Phóng to/thu nhỏ, Di chuyển)
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(defaultTargetPos.x, defaultTargetPos.y, defaultTargetPos.z);
+            controls.enableDamping = true; // Hiệu ứng quán tính mượt mà
+            controls.dampingFactor = 0.06;
+            controls.autoRotate = state.autoRotate;
+            controls.autoRotateSpeed = 0.55;
+            controls.minDistance = 2.5;
+            controls.maxDistance = 15;
+
+            // 5. Hệ thống ánh sáng vật lý & đổ bóng
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+            scene.add(ambientLight);
+
+            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.95);
+            dirLight1.position.set(4.5, 8.5, 5.5);
+            dirLight1.castShadow = true;
+            dirLight1.shadow.mapSize.width = 2048;
+            dirLight1.shadow.mapSize.height = 2048;
+            dirLight1.shadow.camera.near = 1;
+            dirLight1.shadow.camera.far = 25;
+            const d = 5;
+            dirLight1.shadow.camera.left = -d;
+            dirLight1.shadow.camera.right = d;
+            dirLight1.shadow.camera.top = d;
+            dirLight1.shadow.camera.bottom = -d;
+            dirLight1.shadow.bias = -0.0005;
+            scene.add(dirLight1);
+
+            const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.35);
+            dirLight2.position.set(-5, 3, -5);
+            scene.add(dirLight2);
+
+            // 6. Tạo hình chóp tứ giác đều, lưới tọa độ & mặt hứng bóng
+            createPyramid();
+            createHelpers();
+
+            // 7. Thiết lập giao diện điều khiển & áp dụng chế độ mặc định
+            setupUIEvents();
+            applyDisplayMode(state.displayMode);
+
+            // Xử lý sự kiện thay đổi kích thước màn hình (Responsive)
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        /**
+         * Tạo Sprite nhãn chữ nổi 3D luôn hướng về camera (Billboard)
+         */
+        function createTextLabel(text, color = '#ffffff', bgColor = 'rgba(15, 23, 42, 0.75)') {
+            const canvas = document.createElement('canvas');
+            const size = 128;
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Vẽ hình tròn nền nhẹ cho chữ dễ đọc trên mọi nền
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, 44, 0, Math.PI * 2);
+            ctx.fillStyle = bgColor;
+            ctx.fill();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = color;
+            ctx.stroke();
+
+            // Vẽ chữ
+            ctx.font = 'bold 52px Inter, sans-serif';
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, size / 2, size / 2 + 3);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({
+                map: texture,
+                transparent: true,
+                depthTest: true,  // Bị che khuất tự nhiên khi nằm sau khối đặc
+                depthWrite: false
+            });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(0.42, 0.42, 1);
+            return sprite;
+        }
+
+        /**
+         * Tạo hình chóp tứ giác đều (Square Pyramid) từ đỉnh tùy chỉnh (BufferGeometry)
+         * hỗ trợ chuyển đổi mượt mà giữa Khối đặc (Thực tế), Xuyên thấu và Khung dây.
+         */
+        function createPyramid() {
+            pyramidGroup = new THREE.Group();
+
+            // Kích thước hình chóp: Đáy cạnh 2.6, Chiều cao 2.4
+            const halfBase = 1.3;
+            const height = 2.4;
+
+            // Tọa độ 5 đỉnh của hình chóp S.ABCD (Đáy nằm trên mặt phẳng y = 0)
+            const S = [0, height, 0];              // Đỉnh S
+            const A = [-halfBase, 0, halfBase];    // Đáy A (Trước - Trái)
+            const B = [halfBase, 0, halfBase];     // Đáy B (Trước - Phải)
+            const C = [halfBase, 0, -halfBase];    // Đáy C (Sau - Phải)
+            const D = [-halfBase, 0, -halfBase];   // Đáy D (Sau - Trái)
+            const O = [0, 0, 0];                   // Tâm đáy O
+
+            // Định nghĩa 6 tam giác (4 mặt bên + 2 tam giác ghép thành mặt đáy vuông)
+            // Thứ tự đỉnh ngược chiều kim đồng hồ khi nhìn từ ngoài vào (Right-hand rule)
+            const vertices = new Float32Array([
+                // Mặt bên 1: SAB (Trước)
+                ...S, ...A, ...B,
+                // Mặt bên 2: SBC (Phải)
+                ...S, ...B, ...C,
+                // Mặt bên 3: SCD (Sau)
+                ...S, ...C, ...D,
+                // Mặt bên 4: SDA (Trái)
+                ...S, ...D, ...A,
+                // Mặt đáy 1: ADC
+                ...A, ...D, ...C,
+                // Mặt đáy 2: ACB
+                ...A, ...C, ...B
+            ]);
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+            geometry.computeVertexNormals();
+
+            // Chia nhóm (Groups) để gán vật liệu vật lý chân thực cho từng mặt
+            const colors = colorThemes[state.theme];
+            faceMaterials = [];
+
+            for (let i = 0; i < 6; i++) {
+                // Mỗi tam giác gồm 3 đỉnh
+                geometry.addGroup(i * 3, 3, i);
+
+                const mat = new THREE.MeshStandardMaterial({
+                    color: colors[i],
+                    roughness: 0.38,
+                    metalness: 0.08,
+                    transparent: false,
+                    opacity: 1.0,
+                    side: THREE.FrontSide,
+                    depthWrite: true,
+                    polygonOffset: true,
+                    polygonOffsetFactor: 1,
+                    polygonOffsetUnits: 1
+                });
+                faceMaterials.push(mat);
+            }
+
+            pyramidMesh = new THREE.Mesh(geometry, faceMaterials);
+            pyramidMesh.castShadow = true;
+            pyramidMesh.receiveShadow = true;
+            pyramidGroup.add(pyramidMesh);
+
+            // Tạo các đường cạnh nổi bật (EdgesGeometry loại bỏ đường chéo của mặt đáy vuông)
+            const edgesGeo = new THREE.EdgesGeometry(geometry, 15); // Góc ngưỡng 15 độ để ẩn đường chéo đáy
+            const edgesMat = new THREE.LineBasicMaterial({
+                color: 0xffffff,
+                linewidth: 2,
+                transparent: true,
+                opacity: 0.85
+            });
+            edgesLine = new THREE.LineSegments(edgesGeo, edgesMat);
+            pyramidGroup.add(edgesLine);
+
+            // Thêm các điểm nút tại 5 đỉnh S, A, B, C, D và tâm đáy O
+            const vertexConfigs = [
+                { name: 'S', coord: S, offset: [0, 0.28, 0], color: '#facc15', dotColor: 0xfacc15 },
+                { name: 'A', coord: A, offset: [-0.22, 0.12, 0.22], color: '#38bdf8', dotColor: 0x38bdf8 },
+                { name: 'B', coord: B, offset: [0.22, 0.12, 0.22], color: '#38bdf8', dotColor: 0x38bdf8 },
+                { name: 'C', coord: C, offset: [0.22, 0.12, -0.22], color: '#38bdf8', dotColor: 0x38bdf8 },
+                { name: 'D', coord: D, offset: [-0.22, 0.12, -0.22], color: '#38bdf8', dotColor: 0x38bdf8 },
+                { name: 'O', coord: O, offset: [0.22, 0.15, 0], color: '#cbd5e1', dotColor: 0x94a3b8 }
+            ];
+            
+            const dotGeo = new THREE.SphereGeometry(0.055, 16, 16);
+            labelSprites = [];
+
+            vertexConfigs.forEach((item) => {
+                const dot = new THREE.Mesh(dotGeo, new THREE.MeshBasicMaterial({ color: item.dotColor }));
+                dot.position.set(item.coord[0], item.coord[1], item.coord[2]);
+                pyramidGroup.add(dot);
+
+                const sprite = createTextLabel(item.name, item.color);
+                sprite.position.set(
+                    item.coord[0] + item.offset[0],
+                    item.coord[1] + item.offset[1],
+                    item.coord[2] + item.offset[2]
+                );
+                pyramidGroup.add(sprite);
+                labelSprites.push({ sprite, isInternal: item.name === 'O' });
+            });
+
+            // Đường cao SO nét đứt từ đỉnh S xuống tâm O của đáy
+            const heightLineGeo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(0, height, 0),
+                new THREE.Vector3(0, 0, 0)
+            ]);
+            const heightLineMat = new THREE.LineDashedMaterial({
+                color: 0xe2e8f0,
+                dashSize: 0.12,
+                gapSize: 0.08,
+                transparent: true,
+                opacity: 0.75
+            });
+            heightLine = new THREE.Line(heightLineGeo, heightLineMat);
+            heightLine.computeLineDistances(); // Bắt buộc cho LineDashedMaterial
+            pyramidGroup.add(heightLine);
+
+            scene.add(pyramidGroup);
+        }
+
+        /**
+         * Tạo mặt sàn hứng bóng đổ và lưới tọa độ (GridHelper) bên dưới
+         */
+        function createHelpers() {
+            // Mặt phẳng hứng bóng đổ vật lý (ShadowMaterial trong suốt chỉ hiển thị bóng đổ)
+            const planeGeo = new THREE.PlaneGeometry(20, 20);
+            const planeMat = new THREE.ShadowMaterial({
+                opacity: 0.48
+            });
+            shadowPlane = new THREE.Mesh(planeGeo, planeMat);
+            shadowPlane.rotation.x = -Math.PI / 2;
+            shadowPlane.position.y = -0.005;
+            shadowPlane.receiveShadow = true;
+            scene.add(shadowPlane);
+
+            // Lưới tọa độ 12x12 chia 24 ô
+            gridHelper = new THREE.GridHelper(12, 24, 0x38bdf8, 0x1e293b);
+            gridHelper.position.y = -0.01; // Đặt ngay dưới đáy hình chóp
+            gridHelper.material.transparent = true;
+            gridHelper.material.opacity = 0.65;
+            scene.add(gridHelper);
+        }
+
+        /**
+         * Cập nhật chế độ hiển thị: 'solid' (Khối đặc), 'translucent' (Xuyên thấu), 'wireframe' (Khung dây)
+         */
+        function applyDisplayMode(mode) {
+            state.displayMode = mode;
+
+            const btnSolid = document.getElementById('mode-solid');
+            const btnTranslucent = document.getElementById('mode-translucent');
+            const btnWireframe = document.getElementById('mode-wireframe');
+            const opacityGroup = document.getElementById('opacity-control-group');
+
+            const activeClass = "py-1.5 px-1.5 text-[11px] font-medium rounded-lg bg-sky-500 text-white shadow transition";
+            const inactiveClass = "py-1.5 px-1.5 text-[11px] font-medium rounded-lg text-slate-400 hover:text-white transition";
+
+            btnSolid.className = mode === 'solid' ? activeClass : inactiveClass;
+            btnTranslucent.className = mode === 'translucent' ? activeClass : inactiveClass;
+            btnWireframe.className = mode === 'wireframe' ? activeClass : inactiveClass;
+
+            if (mode === 'solid') {
+                // Chế độ Khối đặc (Thế giới thực): Không nhìn xuyên thấu, đổ bóng thật, che khuất chi tiết bên trong
+                pyramidMesh.visible = true;
+                pyramidMesh.castShadow = true;
+                shadowPlane.visible = true;
+                edgesLine.material.color.setHex(0xffffff);
+                edgesLine.material.opacity = 0.65;
+
+                faceMaterials.forEach(mat => {
+                    mat.transparent = false;
+                    mat.opacity = 1.0;
+                    mat.side = THREE.FrontSide;
+                    mat.depthWrite = true;
+                    mat.needsUpdate = true;
+                });
+
+                opacityGroup.classList.add('opacity-40', 'pointer-events-none');
+            } else if (mode === 'translucent') {
+                // Chế độ Xuyên thấu (Hình học): Bán trong suốt, nhìn rõ đường cao SO & các cạnh khuất bên trong
+                pyramidMesh.visible = true;
+                pyramidMesh.castShadow = false;
+                shadowPlane.visible = false;
+                edgesLine.material.color.setHex(0xffffff);
+                edgesLine.material.opacity = 0.95;
+
+                faceMaterials.forEach(mat => {
+                    mat.transparent = true;
+                    mat.opacity = state.opacity;
+                    mat.side = THREE.DoubleSide;
+                    mat.depthWrite = false;
+                    mat.needsUpdate = true;
+                });
+
+                opacityGroup.classList.remove('opacity-40', 'pointer-events-none');
+            } else if (mode === 'wireframe') {
+                // Chế độ Khung dây: Chỉ hiển thị các cạnh viền, đỉnh và đường cao SO
+                pyramidMesh.visible = false;
+                shadowPlane.visible = false;
+                edgesLine.material.color.setHex(0x38bdf8);
+                edgesLine.material.opacity = 1.0;
+
+                opacityGroup.classList.add('opacity-40', 'pointer-events-none');
+            }
+        }
+
+        /**
+         * Cập nhật kích thước canvas khi thay đổi kích thước cửa sổ
+         */
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            if (!container) return;
+            
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        /**
+         * Vòng lặp hoạt ảnh chính
+         */
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); // Cập nhật OrbitControls và AutoRotate
+            renderer.render(scene, camera);
+        }
+
+        /**
+         * Thiết lập các sự kiện tương tác với bảng điều khiển UI
+         */
+        function setupUIEvents() {
+            // 1. Nút bật/tắt tự động xoay
+            const btnAutoRotate = document.getElementById('btn-auto-rotate');
+            const autoRotateKnob = document.getElementById('auto-rotate-knob');
+            
+            btnAutoRotate.addEventListener('click', () => {
+                state.autoRotate = !state.autoRotate;
+                controls.autoRotate = state.autoRotate;
+                btnAutoRotate.setAttribute('aria-checked', state.autoRotate);
+                
+                if (state.autoRotate) {
+                    btnAutoRotate.classList.remove('bg-slate-700');
+                    btnAutoRotate.classList.add('bg-sky-500');
+                    autoRotateKnob.classList.add('translate-x-5');
+                    autoRotateKnob.classList.remove('translate-x-0');
+                } else {
+                    btnAutoRotate.classList.add('bg-slate-700');
+                    btnAutoRotate.classList.remove('bg-sky-500');
+                    autoRotateKnob.classList.remove('translate-x-5');
+                    autoRotateKnob.classList.add('translate-x-0');
+                }
+            });
+
+            // 2. Chế độ hiển thị: Khối đặc vs Xuyên thấu vs Khung dây
+            document.getElementById('mode-solid').addEventListener('click', () => applyDisplayMode('solid'));
+            document.getElementById('mode-translucent').addEventListener('click', () => applyDisplayMode('translucent'));
+            document.getElementById('mode-wireframe').addEventListener('click', () => applyDisplayMode('wireframe'));
+
+            // 3. Thanh trượt điều chỉnh độ trong suốt (chỉ hoạt động ở chế độ Xuyên thấu)
+            const opacitySlider = document.getElementById('opacity-slider');
+            const opacityValue = document.getElementById('opacity-value');
+
+            opacitySlider.addEventListener('input', (e) => {
+                state.opacity = parseFloat(e.target.value);
+                opacityValue.textContent = Math.round(state.opacity * 100) + '%';
+                
+                if (state.displayMode === 'translucent') {
+                    faceMaterials.forEach(mat => {
+                        mat.opacity = state.opacity;
+                    });
+                }
+            });
+
+            // 4. Chọn bảng màu sắc
+            const themeButtons = document.querySelectorAll('.theme-btn');
+            themeButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const selectedTheme = btn.getAttribute('data-theme');
+                    state.theme = selectedTheme;
+                    const newColors = colorThemes[selectedTheme];
+
+                    // Cập nhật màu cho từng mặt
+                    faceMaterials.forEach((mat, index) => {
+                        mat.color.setHex(newColors[index]);
+                    });
+
+                    // Cập nhật trạng thái active trên nút
+                    themeButtons.forEach(b => {
+                        b.classList.remove('ring-2', 'ring-sky-400', 'opacity-100');
+                        b.classList.add('opacity-75');
+                    });
+                    btn.classList.add('ring-2', 'ring-sky-400', 'opacity-100');
+                    btn.classList.remove('opacity-75');
+                });
+            });
+
+            // 5. Ẩn / Hiện lưới tọa độ
+            const btnToggleGrid = document.getElementById('btn-toggle-grid');
+            btnToggleGrid.addEventListener('click', () => {
+                state.showGrid = !state.showGrid;
+                gridHelper.visible = state.showGrid;
+            });
+
+            // 6. Đặt lại góc nhìn mặc định (Reset Camera mượt mà)
+            const btnResetCamera = document.getElementById('btn-reset-camera');
+            btnResetCamera.addEventListener('click', () => {
+                camera.position.set(defaultCameraPos.x, defaultCameraPos.y, defaultCameraPos.z);
+                controls.target.set(defaultTargetPos.x, defaultTargetPos.y, defaultTargetPos.z);
+                controls.update();
+            });
+
+            // 7. Nút ẩn/hiện bảng điều khiển trên thiết bị di động
+            const togglePanelBtn = document.getElementById('toggle-panel-btn');
+            const controlPanel = document.getElementById('control-panel');
+            let isPanelOpen = true;
+
+            togglePanelBtn.addEventListener('click', () => {
+                isPanelOpen = !isPanelOpen;
+                if (isPanelOpen) {
+                    controlPanel.classList.remove('translate-y-[120%]', 'opacity-0', 'pointer-events-none');
+                } else {
+                    controlPanel.classList.add('translate-y-[120%]', 'opacity-0', 'pointer-events-none');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
